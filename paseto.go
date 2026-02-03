@@ -51,13 +51,54 @@ type GenerateKeysResponse struct {
 }
 
 // decodeBase64Key decodes a base64-encoded key to bytes
+// Supports both standard and URL-safe base64 encoding
 func decodeBase64Key(keyB64 string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(keyB64)
+	// Try standard base64 first
+	decoded, err := base64.StdEncoding.DecodeString(keyB64)
+	if err == nil {
+		return decoded, nil
+	}
+
+	// Try URL-safe base64
+	decoded, err = base64.URLEncoding.DecodeString(keyB64)
+	if err == nil {
+		return decoded, nil
+	}
+
+	// Try without padding (common in some implementations)
+	decoded, err = base64.RawStdEncoding.DecodeString(keyB64)
+	if err == nil {
+		return decoded, nil
+	}
+
+	decoded, err = base64.RawURLEncoding.DecodeString(keyB64)
+	if err == nil {
+		return decoded, nil
+	}
+
+	return nil, fmt.Errorf("invalid base64 encoding")
 }
 
 // encodeBase64Key encodes bytes to base64
 func encodeBase64Key(key []byte) string {
 	return base64.StdEncoding.EncodeToString(key)
+}
+
+// Key size constants for different versions
+const (
+	symmetricKeySize     = 32 // All versions use 32-byte symmetric keys
+	v2v4SecretKeySize    = 64 // Ed25519 secret key
+	v2v4PublicKeySize    = 32 // Ed25519 public key
+	v3SecretKeySize      = 48 // P-384 scalar
+	v3PublicKeySize      = 49 // Compressed P-384 point
+)
+
+// validateKeySize checks if the key has the expected size
+func validateKeySize(keyBytes []byte, expected int, keyType string) error {
+	if len(keyBytes) != expected {
+		return fmt.Errorf("invalid %s: got %d bytes, expected %d bytes", keyType, len(keyBytes), expected)
+	}
+	return nil
 }
 
 // EncodePaseto creates a PASETO token from the given request
@@ -105,12 +146,18 @@ func encodeV2(token paseto.Token, purpose, keyB64 string) (string, error) {
 
 	switch purpose {
 	case "local":
+		if err := validateKeySize(keyBytes, symmetricKeySize, "symmetric key"); err != nil {
+			return "", err
+		}
 		key, err := paseto.V2SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return token.V2Encrypt(key), nil
 	case "public":
+		if err := validateKeySize(keyBytes, v2v4SecretKeySize, "secret key"); err != nil {
+			return "", err
+		}
 		key, err := paseto.NewV2AsymmetricSecretKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid secret key: %w", err)
@@ -129,12 +176,18 @@ func encodeV3(token paseto.Token, purpose, keyB64 string) (string, error) {
 
 	switch purpose {
 	case "local":
+		if err := validateKeySize(keyBytes, symmetricKeySize, "symmetric key"); err != nil {
+			return "", err
+		}
 		key, err := paseto.V3SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return token.V3Encrypt(key, nil), nil
 	case "public":
+		if err := validateKeySize(keyBytes, v3SecretKeySize, "secret key"); err != nil {
+			return "", err
+		}
 		key, err := paseto.NewV3AsymmetricSecretKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid secret key: %w", err)
@@ -153,12 +206,18 @@ func encodeV4(token paseto.Token, purpose, keyB64 string) (string, error) {
 
 	switch purpose {
 	case "local":
+		if err := validateKeySize(keyBytes, symmetricKeySize, "symmetric key"); err != nil {
+			return "", err
+		}
 		key, err := paseto.V4SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return token.V4Encrypt(key, nil), nil
 	case "public":
+		if err := validateKeySize(keyBytes, v2v4SecretKeySize, "secret key"); err != nil {
+			return "", err
+		}
 		key, err := paseto.NewV4AsymmetricSecretKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid secret key: %w", err)
@@ -246,12 +305,18 @@ func decodeV2(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paset
 
 	switch purpose {
 	case "local":
+		if err := validateKeySize(keyBytes, symmetricKeySize, "symmetric key"); err != nil {
+			return nil, err
+		}
 		key, err := paseto.V2SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return parser.ParseV2Local(key, tokenString)
 	case "public":
+		if err := validateKeySize(keyBytes, v2v4PublicKeySize, "public key"); err != nil {
+			return nil, err
+		}
 		key, err := paseto.NewV2AsymmetricPublicKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key: %w", err)
@@ -270,12 +335,18 @@ func decodeV3(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paset
 
 	switch purpose {
 	case "local":
+		if err := validateKeySize(keyBytes, symmetricKeySize, "symmetric key"); err != nil {
+			return nil, err
+		}
 		key, err := paseto.V3SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return parser.ParseV3Local(key, tokenString, nil)
 	case "public":
+		if err := validateKeySize(keyBytes, v3PublicKeySize, "public key"); err != nil {
+			return nil, err
+		}
 		key, err := paseto.NewV3AsymmetricPublicKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key: %w", err)
@@ -294,12 +365,18 @@ func decodeV4(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paset
 
 	switch purpose {
 	case "local":
+		if err := validateKeySize(keyBytes, symmetricKeySize, "symmetric key"); err != nil {
+			return nil, err
+		}
 		key, err := paseto.V4SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return parser.ParseV4Local(key, tokenString, nil)
 	case "public":
+		if err := validateKeySize(keyBytes, v2v4PublicKeySize, "public key"); err != nil {
+			return nil, err
+		}
 		key, err := paseto.NewV4AsymmetricPublicKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key: %w", err)

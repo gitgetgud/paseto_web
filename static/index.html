@@ -263,7 +263,7 @@
                 <div class="select-row">
                     <div>
                         <label for="version">Version</label>
-                        <select id="version" onchange="updateKeyPlaceholder()">
+                        <select id="version" onchange="updateKeyPlaceholder(); clearGeneratedKeys()">
                             <option value="v4">V4 (Recommended)</option>
                             <option value="v3">V3</option>
                             <option value="v2">V2</option>
@@ -271,7 +271,7 @@
                     </div>
                     <div>
                         <label for="purpose">Purpose</label>
-                        <select id="purpose" onchange="updateKeyPlaceholder()">
+                        <select id="purpose" onchange="updateKeyPlaceholder(); clearGeneratedKeys()">
                             <option value="local">Local (Symmetric Encryption)</option>
                             <option value="public">Public (Asymmetric Signing)</option>
                         </select>
@@ -353,19 +353,26 @@
         }
 
         function updateKeyPlaceholder() {
+            const version = document.getElementById('version').value;
             const purpose = document.getElementById('purpose').value;
             const encodeKeyInput = document.getElementById('encode-key');
             const decodeKeyInput = document.getElementById('decode-key');
             const keyHint = document.getElementById('key-hint');
 
             if (purpose === 'local') {
-                encodeKeyInput.placeholder = 'Base64-encoded symmetric key';
-                decodeKeyInput.placeholder = 'Base64-encoded symmetric key';
-                keyHint.textContent = 'Symmetric key for encryption/decryption (base64)';
+                encodeKeyInput.placeholder = 'Base64-encoded symmetric key (32 bytes)';
+                decodeKeyInput.placeholder = 'Base64-encoded symmetric key (32 bytes)';
+                keyHint.textContent = 'Symmetric key: 32 bytes (44 chars in base64)';
             } else {
-                encodeKeyInput.placeholder = 'Base64-encoded secret key (for signing)';
-                decodeKeyInput.placeholder = 'Base64-encoded public key (for verification)';
-                keyHint.textContent = 'Secret key for signing. Share the public key for verification (base64).';
+                if (version === 'v3') {
+                    encodeKeyInput.placeholder = 'Base64-encoded secret key (48 bytes)';
+                    decodeKeyInput.placeholder = 'Base64-encoded public key (49 bytes)';
+                    keyHint.textContent = 'V3 uses P-384: secret key 48 bytes, public key 49 bytes';
+                } else {
+                    encodeKeyInput.placeholder = 'Base64-encoded secret key (64 bytes)';
+                    decodeKeyInput.placeholder = 'Base64-encoded public key (32 bytes)';
+                    keyHint.textContent = 'V2/V4 use Ed25519: secret key 64 bytes, public key 32 bytes';
+                }
             }
         }
 
@@ -504,6 +511,11 @@
                 btn.textContent = 'Copied!';
                 setTimeout(() => btn.textContent = originalText, 1500);
             });
+        }
+
+        function clearGeneratedKeys() {
+            document.getElementById('generated-keys').classList.add('hidden');
+            document.getElementById('encode-key').value = '';
         }
 
         // Initialize
