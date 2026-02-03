@@ -1,0 +1,12 @@
+services:
+  paseto-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paseto-web
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - CORS_ORIGIN=https://paseto.getgud.boo
+    restart: unless-stopped

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PASETO Encoder/Decoder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #06b6d4, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #a1a1aa;
+            margin-bottom: 2rem;
+        }
+
+        .mode-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .mode-btn {
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: #27272a;
+            color: #a1a1aa;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(90deg, #06b6d4, #8b5cf6);
+            color: white;
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: #3f3f46;
+        }
+
+        .card {
+            background: rgba(39, 39, 42, 0.8);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid #3f3f46;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #d4d4d8;
+        }
+
+        .select-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        select, input, textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #3f3f46;
+            border-radius: 8px;
+            background: #18181b;
+            color: #e4e4e7;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #06b6d4;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+
+        .key-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .key-row input {
+            flex: 1;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-generate {
+            background: #3f3f46;
+            color: #e4e4e7;
+            white-space: nowrap;
+        }
+
+        .btn-generate:hover {
+            background: #52525b;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #06b6d4, #8b5cf6);
+            color: white;
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .result-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #3f3f46;
+        }
+
+        .result-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-copy {
+            background: transparent;
+            border: 1px solid #3f3f46;
+            color: #a1a1aa;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
+        .btn-copy:hover {
+            background: #3f3f46;
+            color: #e4e4e7;
+        }
+
+        .result-box {
+            background: #18181b;
+            border: 1px solid #3f3f46;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            word-break: break-all;
+            min-height: 60px;
+            color: #22c55e;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        .key-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(6, 182, 212, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        .key-info p {
+            font-size: 0.85rem;
+            color: #a1a1aa;
+            margin-bottom: 0.5rem;
+        }
+
+        .key-info code {
+            display: block;
+            background: #18181b;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            word-break: break-all;
+            color: #06b6d4;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .info-text {
+            font-size: 0.85rem;
+            color: #71717a;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 600px) {
+            .select-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .key-row {
+                flex-direction: column;
+            }
+            
+            body {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PASETO</h1>
+        <p class="subtitle">Platform-Agnostic Security Tokens - Encoder & Decoder</p>
+
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setMode('encode')" id="btn-encode">Encode</button>
+            <button class="mode-btn" onclick="setMode('decode')" id="btn-decode">Decode</button>
+        </div>
+
+        <div class="card">
+            <!-- Common settings -->
+            <div class="form-group">
+                <div class="select-row">
+                    <div>
+                        <label for="version">Version</label>
+                        <select id="version" onchange="updateKeyPlaceholder()">
+                            <option value="v4">V4 (Recommended)</option>
+                            <option value="v3">V3</option>
+                            <option value="v2">V2</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="purpose">Purpose</label>
+                        <select id="purpose" onchange="updateKeyPlaceholder()">
+                            <option value="local">Local (Symmetric Encryption)</option>
+                            <option value="public">Public (Asymmetric Signing)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Encode Section -->
+            <div id="encode-section">
+                <div class="form-group">
+                    <label for="payload">Payload (JSON)</label>
+                    <textarea id="payload" placeholder='{"user": "john", "role": "admin"}'></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="footer">Footer (Optional)</label>
+                    <input type="text" id="footer" placeholder="Optional footer data">
+                </div>
+
+                <div class="form-group">
+                    <label id="key-label">Key (Hex)</label>
+                    <div class="key-row">
+                        <input type="text" id="encode-key" placeholder="Hex-encoded key">
+                        <button class="btn btn-generate" onclick="generateKey()">Generate Key</button>
+                    </div>
+                    <p class="info-text" id="key-hint">For local: symmetric key. For public: secret key.</p>
+                </div>
+
+                <div class="key-info hidden" id="generated-keys">
+                    <p><strong>Generated Keys:</strong></p>
+                    <p id="sym-key-container">Symmetric Key: <code id="sym-key"></code></p>
+                    <p id="secret-key-container" class="hidden">Secret Key: <code id="secret-key"></code></p>
+                    <p id="public-key-container" class="hidden">Public Key: <code id="public-key"></code></p>
+                </div>
+
+                <button class="btn btn-primary" onclick="encode()">Encode Token</button>
+            </div>
+
+            <!-- Decode Section -->
+            <div id="decode-section" class="hidden">
+                <div class="form-group">
+                    <label for="token-input">PASETO Token</label>
+                    <textarea id="token-input" placeholder="v4.local.xxxxx... or v4.public.xxxxx..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label id="decode-key-label">Key (Hex)</label>
+                    <div class="key-row">
+                        <input type="text" id="decode-key" placeholder="Hex-encoded key">
+                    </div>
+                    <p class="info-text">For local: symmetric key. For public: public key.</p>
+                </div>
+
+                <button class="btn btn-primary" onclick="decode()">Decode Token</button>
+            </div>
+
+            <!-- Result Section -->
+            <div class="result-section hidden" id="result-section">
+                <div class="result-label">
+                    <label id="result-label">Result</label>
+                    <button class="btn btn-copy" onclick="copyResult()">Copy</button>
+                </div>
+                <div class="result-box" id="result-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'encode';
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-encode').classList.toggle('active', mode === 'encode');
+            document.getElementById('btn-decode').classList.toggle('active', mode === 'decode');
+            document.getElementById('encode-section').classList.toggle('hidden', mode !== 'encode');
+            document.getElementById('decode-section').classList.toggle('hidden', mode !== 'decode');
+            document.getElementById('result-section').classList.add('hidden');
+            updateKeyPlaceholder();
+        }
+
+        function updateKeyPlaceholder() {
+            const purpose = document.getElementById('purpose').value;
+            const encodeKeyInput = document.getElementById('encode-key');
+            const decodeKeyInput = document.getElementById('decode-key');
+            const keyHint = document.getElementById('key-hint');
+
+            if (purpose === 'local') {
+                encodeKeyInput.placeholder = 'Hex-encoded symmetric key';
+                decodeKeyInput.placeholder = 'Hex-encoded symmetric key';
+                keyHint.textContent = 'Symmetric key for encryption/decryption';
+            } else {
+                encodeKeyInput.placeholder = 'Hex-encoded secret key (for signing)';
+                decodeKeyInput.placeholder = 'Hex-encoded public key (for verification)';
+                keyHint.textContent = 'Secret key for signing. Share the public key for verification.';
+            }
+        }
+
+        async function generateKey() {
+            const version = document.getElementById('version').value;
+            const purpose = document.getElementById('purpose').value;
+
+            try {
+                const response = await fetch('/api/generate-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ version, purpose })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showResult(data.error, true);
+                    return;
+                }
+
+                const keysDiv = document.getElementById('generated-keys');
+                keysDiv.classList.remove('hidden');
+
+                if (purpose === 'local') {
+                    document.getElementById('encode-key').value = data.symmetricKey;
+                    document.getElementById('sym-key-container').classList.remove('hidden');
+                    document.getElementById('secret-key-container').classList.add('hidden');
+                    document.getElementById('public-key-container').classList.add('hidden');
+                    document.getElementById('sym-key').textContent = data.symmetricKey;
+                } else {
+                    document.getElementById('encode-key').value = data.secretKey;
+                    document.getElementById('sym-key-container').classList.add('hidden');
+                    document.getElementById('secret-key-container').classList.remove('hidden');
+                    document.getElementById('public-key-container').classList.remove('hidden');
+                    document.getElementById('secret-key').textContent = data.secretKey;
+                    document.getElementById('public-key').textContent = data.publicKey;
+                }
+            } catch (err) {
+                showResult('Failed to generate keys: ' + err.message, true);
+            }
+        }
+
+        async function encode() {
+            const version = document.getElementById('version').value;
+            const purpose = document.getElementById('purpose').value;
+            const payloadText = document.getElementById('payload').value;
+            const footer = document.getElementById('footer').value;
+            const key = document.getElementById('encode-key').value;
+
+            if (!key) {
+                showResult('Please provide a key or generate one', true);
+                return;
+            }
+
+            let payload;
+            try {
+                payload = payloadText ? JSON.parse(payloadText) : {};
+            } catch (err) {
+                showResult('Invalid JSON payload: ' + err.message, true);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/encode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ version, purpose, payload, key, footer })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showResult(data.error, true);
+                } else {
+                    showResult(data.token, false);
+                    document.getElementById('result-label').textContent = 'Generated Token';
+                }
+            } catch (err) {
+                showResult('Failed to encode: ' + err.message, true);
+            }
+        }
+
+        async function decode() {
+            const token = document.getElementById('token-input').value;
+            const key = document.getElementById('decode-key').value;
+
+            if (!token) {
+                showResult('Please provide a token to decode', true);
+                return;
+            }
+
+            if (!key) {
+                showResult('Please provide a key', true);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/decode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token, key })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showResult(data.error, true);
+                } else {
+                    let result = JSON.stringify(data.payload, null, 2);
+                    if (data.footer) {
+                        result += '\n\nFooter: ' + data.footer;
+                    }
+                    showResult(result, false);
+                    document.getElementById('result-label').textContent = 'Decoded Payload';
+                }
+            } catch (err) {
+                showResult('Failed to decode: ' + err.message, true);
+            }
+        }
+
+        function showResult(text, isError) {
+            const resultSection = document.getElementById('result-section');
+            const resultBox = document.getElementById('result-box');
+            
+            resultSection.classList.remove('hidden');
+            resultBox.textContent = text;
+            resultBox.classList.toggle('error', isError);
+        }
+
+        function copyResult() {
+            const resultBox = document.getElementById('result-box');
+            navigator.clipboard.writeText(resultBox.textContent).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = originalText, 1500);
+            });
+        }
+
+        // Initialize
+        updateKeyPlaceholder();
+    </script>
+</body>
+</html>
