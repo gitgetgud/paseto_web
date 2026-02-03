@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -13,7 +14,7 @@ type EncodeRequest struct {
 	Version string                 `json:"version"` // v2, v3, v4
 	Purpose string                 `json:"purpose"` // local or public
 	Payload map[string]interface{} `json:"payload"`
-	Key     string                 `json:"key"`    // hex-encoded key
+	Key     string                 `json:"key"`    // base64-encoded key
 	Footer  string                 `json:"footer"` // optional footer
 }
 
@@ -25,7 +26,7 @@ type EncodeResponse struct {
 // DecodeRequest represents a request to decode a PASETO token
 type DecodeRequest struct {
 	Token   string `json:"token"`
-	Key     string `json:"key"`     // hex-encoded key
+	Key     string `json:"key"`     // base64-encoded key
 	Version string `json:"version"` // optional, auto-detect from token
 	Purpose string `json:"purpose"` // optional, auto-detect from token
 }
@@ -47,6 +48,16 @@ type GenerateKeysResponse struct {
 	SymmetricKey string `json:"symmetricKey,omitempty"`
 	SecretKey    string `json:"secretKey,omitempty"`
 	PublicKey    string `json:"publicKey,omitempty"`
+}
+
+// decodeBase64Key decodes a base64-encoded key to bytes
+func decodeBase64Key(keyB64 string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(keyB64)
+}
+
+// encodeBase64Key encodes bytes to base64
+func encodeBase64Key(key []byte) string {
+	return base64.StdEncoding.EncodeToString(key)
 }
 
 // EncodePaseto creates a PASETO token from the given request
@@ -86,16 +97,21 @@ func EncodePaseto(req EncodeRequest) (*EncodeResponse, error) {
 	return &EncodeResponse{Token: tokenString}, nil
 }
 
-func encodeV2(token paseto.Token, purpose, keyHex string) (string, error) {
+func encodeV2(token paseto.Token, purpose, keyB64 string) (string, error) {
+	keyBytes, err := decodeBase64Key(keyB64)
+	if err != nil {
+		return "", fmt.Errorf("invalid base64 key: %w", err)
+	}
+
 	switch purpose {
 	case "local":
-		key, err := paseto.V2SymmetricKeyFromHex(keyHex)
+		key, err := paseto.V2SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return token.V2Encrypt(key), nil
 	case "public":
-		key, err := paseto.NewV2AsymmetricSecretKeyFromHex(keyHex)
+		key, err := paseto.NewV2AsymmetricSecretKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid secret key: %w", err)
 		}
@@ -105,16 +121,21 @@ func encodeV2(token paseto.Token, purpose, keyHex string) (string, error) {
 	}
 }
 
-func encodeV3(token paseto.Token, purpose, keyHex string) (string, error) {
+func encodeV3(token paseto.Token, purpose, keyB64 string) (string, error) {
+	keyBytes, err := decodeBase64Key(keyB64)
+	if err != nil {
+		return "", fmt.Errorf("invalid base64 key: %w", err)
+	}
+
 	switch purpose {
 	case "local":
-		key, err := paseto.V3SymmetricKeyFromHex(keyHex)
+		key, err := paseto.V3SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return token.V3Encrypt(key, nil), nil
 	case "public":
-		key, err := paseto.NewV3AsymmetricSecretKeyFromHex(keyHex)
+		key, err := paseto.NewV3AsymmetricSecretKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid secret key: %w", err)
 		}
@@ -124,16 +145,21 @@ func encodeV3(token paseto.Token, purpose, keyHex string) (string, error) {
 	}
 }
 
-func encodeV4(token paseto.Token, purpose, keyHex string) (string, error) {
+func encodeV4(token paseto.Token, purpose, keyB64 string) (string, error) {
+	keyBytes, err := decodeBase64Key(keyB64)
+	if err != nil {
+		return "", fmt.Errorf("invalid base64 key: %w", err)
+	}
+
 	switch purpose {
 	case "local":
-		key, err := paseto.V4SymmetricKeyFromHex(keyHex)
+		key, err := paseto.V4SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return token.V4Encrypt(key, nil), nil
 	case "public":
-		key, err := paseto.NewV4AsymmetricSecretKeyFromHex(keyHex)
+		key, err := paseto.NewV4AsymmetricSecretKeyFromBytes(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("invalid secret key: %w", err)
 		}
@@ -212,16 +238,21 @@ func detectTokenType(tokenString string) (version, purpose string, err error) {
 	return version, purpose, nil
 }
 
-func decodeV2(parser paseto.Parser, tokenString, purpose, keyHex string) (*paseto.Token, error) {
+func decodeV2(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paseto.Token, error) {
+	keyBytes, err := decodeBase64Key(keyB64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base64 key: %w", err)
+	}
+
 	switch purpose {
 	case "local":
-		key, err := paseto.V2SymmetricKeyFromHex(keyHex)
+		key, err := paseto.V2SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return parser.ParseV2Local(key, tokenString)
 	case "public":
-		key, err := paseto.NewV2AsymmetricPublicKeyFromHex(keyHex)
+		key, err := paseto.NewV2AsymmetricPublicKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key: %w", err)
 		}
@@ -231,16 +262,21 @@ func decodeV2(parser paseto.Parser, tokenString, purpose, keyHex string) (*paset
 	}
 }
 
-func decodeV3(parser paseto.Parser, tokenString, purpose, keyHex string) (*paseto.Token, error) {
+func decodeV3(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paseto.Token, error) {
+	keyBytes, err := decodeBase64Key(keyB64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base64 key: %w", err)
+	}
+
 	switch purpose {
 	case "local":
-		key, err := paseto.V3SymmetricKeyFromHex(keyHex)
+		key, err := paseto.V3SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return parser.ParseV3Local(key, tokenString, nil)
 	case "public":
-		key, err := paseto.NewV3AsymmetricPublicKeyFromHex(keyHex)
+		key, err := paseto.NewV3AsymmetricPublicKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key: %w", err)
 		}
@@ -250,16 +286,21 @@ func decodeV3(parser paseto.Parser, tokenString, purpose, keyHex string) (*paset
 	}
 }
 
-func decodeV4(parser paseto.Parser, tokenString, purpose, keyHex string) (*paseto.Token, error) {
+func decodeV4(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paseto.Token, error) {
+	keyBytes, err := decodeBase64Key(keyB64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base64 key: %w", err)
+	}
+
 	switch purpose {
 	case "local":
-		key, err := paseto.V4SymmetricKeyFromHex(keyHex)
+		key, err := paseto.V4SymmetricKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid symmetric key: %w", err)
 		}
 		return parser.ParseV4Local(key, tokenString, nil)
 	case "public":
-		key, err := paseto.NewV4AsymmetricPublicKeyFromHex(keyHex)
+		key, err := paseto.NewV4AsymmetricPublicKeyFromBytes(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key: %w", err)
 		}
@@ -288,14 +329,14 @@ func generateV2Keys(purpose string) (*GenerateKeysResponse, error) {
 	case "local":
 		key := paseto.NewV2SymmetricKey()
 		return &GenerateKeysResponse{
-			SymmetricKey: key.ExportHex(),
+			SymmetricKey: encodeBase64Key(key.ExportBytes()),
 		}, nil
 	case "public":
 		secretKey := paseto.NewV2AsymmetricSecretKey()
 		publicKey := secretKey.Public()
 		return &GenerateKeysResponse{
-			SecretKey: secretKey.ExportHex(),
-			PublicKey: publicKey.ExportHex(),
+			SecretKey: encodeBase64Key(secretKey.ExportBytes()),
+			PublicKey: encodeBase64Key(publicKey.ExportBytes()),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported purpose: %s", purpose)
@@ -307,14 +348,14 @@ func generateV3Keys(purpose string) (*GenerateKeysResponse, error) {
 	case "local":
 		key := paseto.NewV3SymmetricKey()
 		return &GenerateKeysResponse{
-			SymmetricKey: key.ExportHex(),
+			SymmetricKey: encodeBase64Key(key.ExportBytes()),
 		}, nil
 	case "public":
 		secretKey := paseto.NewV3AsymmetricSecretKey()
 		publicKey := secretKey.Public()
 		return &GenerateKeysResponse{
-			SecretKey: secretKey.ExportHex(),
-			PublicKey: publicKey.ExportHex(),
+			SecretKey: encodeBase64Key(secretKey.ExportBytes()),
+			PublicKey: encodeBase64Key(publicKey.ExportBytes()),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported purpose: %s", purpose)
@@ -326,14 +367,14 @@ func generateV4Keys(purpose string) (*GenerateKeysResponse, error) {
 	case "local":
 		key := paseto.NewV4SymmetricKey()
 		return &GenerateKeysResponse{
-			SymmetricKey: key.ExportHex(),
+			SymmetricKey: encodeBase64Key(key.ExportBytes()),
 		}, nil
 	case "public":
 		secretKey := paseto.NewV4AsymmetricSecretKey()
 		publicKey := secretKey.Public()
 		return &GenerateKeysResponse{
-			SecretKey: secretKey.ExportHex(),
-			PublicKey: publicKey.ExportHex(),
+			SecretKey: encodeBase64Key(secretKey.ExportBytes()),
+			PublicKey: encodeBase64Key(publicKey.ExportBytes()),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported purpose: %s", purpose)

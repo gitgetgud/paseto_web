@@ -292,9 +292,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label id="key-label">Key (Hex)</label>
+                    <label id="key-label">Key (Base64)</label>
                     <div class="key-row">
-                        <input type="text" id="encode-key" placeholder="Hex-encoded key">
+                        <input type="text" id="encode-key" placeholder="Base64-encoded key">
                         <button class="btn btn-generate" onclick="generateKey()">Generate Key</button>
                     </div>
                     <p class="info-text" id="key-hint">For local: symmetric key. For public: secret key.</p>
@@ -318,9 +318,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label id="decode-key-label">Key (Hex)</label>
+                    <label id="decode-key-label">Key (Base64)</label>
                     <div class="key-row">
-                        <input type="text" id="decode-key" placeholder="Hex-encoded key">
+                        <input type="text" id="decode-key" placeholder="Base64-encoded key">
                     </div>
                     <p class="info-text">For local: symmetric key. For public: public key.</p>
                 </div>
@@ -359,13 +359,13 @@
             const keyHint = document.getElementById('key-hint');
 
             if (purpose === 'local') {
-                encodeKeyInput.placeholder = 'Hex-encoded symmetric key';
-                decodeKeyInput.placeholder = 'Hex-encoded symmetric key';
-                keyHint.textContent = 'Symmetric key for encryption/decryption';
+                encodeKeyInput.placeholder = 'Base64-encoded symmetric key';
+                decodeKeyInput.placeholder = 'Base64-encoded symmetric key';
+                keyHint.textContent = 'Symmetric key for encryption/decryption (base64)';
             } else {
-                encodeKeyInput.placeholder = 'Hex-encoded secret key (for signing)';
-                decodeKeyInput.placeholder = 'Hex-encoded public key (for verification)';
-                keyHint.textContent = 'Secret key for signing. Share the public key for verification.';
+                encodeKeyInput.placeholder = 'Base64-encoded secret key (for signing)';
+                decodeKeyInput.placeholder = 'Base64-encoded public key (for verification)';
+                keyHint.textContent = 'Secret key for signing. Share the public key for verification (base64).';
             }
         }
 
