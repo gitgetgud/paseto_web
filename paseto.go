@@ -11,11 +11,12 @@ import (
 
 // EncodeRequest represents a request to encode a PASETO token
 type EncodeRequest struct {
-	Version string                 `json:"version"` // v2, v3, v4
-	Purpose string                 `json:"purpose"` // local or public
-	Payload map[string]interface{} `json:"payload"`
-	Key     string                 `json:"key"`    // base64-encoded key
-	Footer  string                 `json:"footer"` // optional footer
+	Version   string                 `json:"version"`   // v2, v3, v4
+	Purpose   string                 `json:"purpose"`   // local or public
+	Payload   map[string]interface{} `json:"payload"`
+	Key       string                 `json:"key"`       // key (format depends on keyFormat)
+	KeyFormat string                 `json:"keyFormat"` // "base64" or "raw" (default: base64)
+	Footer    string                 `json:"footer"`    // optional footer
 }
 
 // EncodeResponse represents the response from encoding
@@ -25,10 +26,11 @@ type EncodeResponse struct {
 
 // DecodeRequest represents a request to decode a PASETO token
 type DecodeRequest struct {
-	Token   string `json:"token"`
-	Key     string `json:"key"`     // base64-encoded key
-	Version string `json:"version"` // optional, auto-detect from token
-	Purpose string `json:"purpose"` // optional, auto-detect from token
+	Token     string `json:"token"`
+	Key       string `json:"key"`       // key (format depends on keyFormat)
+	KeyFormat string `json:"keyFormat"` // "base64" or "raw" (default: base64)
+	Version   string `json:"version"`   // optional, auto-detect from token
+	Purpose   string `json:"purpose"`   // optional, auto-detect from token
 }
 
 // DecodeResponse represents the response from decoding
@@ -39,8 +41,9 @@ type DecodeResponse struct {
 
 // GenerateKeysRequest represents a request to generate keys
 type GenerateKeysRequest struct {
-	Version string `json:"version"` // v2, v3, v4
-	Purpose string `json:"purpose"` // local or public
+	Version   string `json:"version"`   // v2, v3, v4
+	Purpose   string `json:"purpose"`   // local or public
+	KeyFormat string `json:"keyFormat"` // "base64" or "raw" (default: base64)
 }
 
 // GenerateKeysResponse represents the response from key generation
@@ -48,6 +51,16 @@ type GenerateKeysResponse struct {
 	SymmetricKey string `json:"symmetricKey,omitempty"`
 	SecretKey    string `json:"secretKey,omitempty"`
 	PublicKey    string `json:"publicKey,omitempty"`
+}
+
+// decodeKey decodes a key string to bytes based on the format
+// format: "raw" = use string directly as bytes, "base64" = decode from base64
+func decodeKey(keyStr string, format string) ([]byte, error) {
+	if format == "raw" {
+		return []byte(keyStr), nil
+	}
+	// Default to base64
+	return decodeBase64Key(keyStr)
 }
 
 // decodeBase64Key decodes a base64-encoded key to bytes
@@ -81,6 +94,14 @@ func decodeBase64Key(keyB64 string) ([]byte, error) {
 
 // encodeBase64Key encodes bytes to base64
 func encodeBase64Key(key []byte) string {
+	return base64.StdEncoding.EncodeToString(key)
+}
+
+// encodeKeyForFormat encodes key bytes based on the requested format
+func encodeKeyForFormat(key []byte, format string) string {
+	if format == "raw" {
+		return string(key)
+	}
 	return base64.StdEncoding.EncodeToString(key)
 }
 
@@ -120,13 +141,19 @@ func EncodePaseto(req EncodeRequest) (*EncodeResponse, error) {
 	var tokenString string
 	var err error
 
+	// Default key format to base64
+	keyFormat := req.KeyFormat
+	if keyFormat == "" {
+		keyFormat = "base64"
+	}
+
 	switch req.Version {
 	case "v2":
-		tokenString, err = encodeV2(token, req.Purpose, req.Key)
+		tokenString, err = encodeV2(token, req.Purpose, req.Key, keyFormat)
 	case "v3":
-		tokenString, err = encodeV3(token, req.Purpose, req.Key)
+		tokenString, err = encodeV3(token, req.Purpose, req.Key, keyFormat)
 	case "v4":
-		tokenString, err = encodeV4(token, req.Purpose, req.Key)
+		tokenString, err = encodeV4(token, req.Purpose, req.Key, keyFormat)
 	default:
 		return nil, fmt.Errorf("unsupported version: %s", req.Version)
 	}
@@ -138,10 +165,10 @@ func EncodePaseto(req EncodeRequest) (*EncodeResponse, error) {
 	return &EncodeResponse{Token: tokenString}, nil
 }
 
-func encodeV2(token paseto.Token, purpose, keyB64 string) (string, error) {
-	keyBytes, err := decodeBase64Key(keyB64)
+func encodeV2(token paseto.Token, purpose, keyStr, keyFormat string) (string, error) {
+	keyBytes, err := decodeKey(keyStr, keyFormat)
 	if err != nil {
-		return "", fmt.Errorf("invalid base64 key: %w", err)
+		return "", fmt.Errorf("invalid key: %w", err)
 	}
 
 	switch purpose {
@@ -168,10 +195,10 @@ func encodeV2(token paseto.Token, purpose, keyB64 string) (string, error) {
 	}
 }
 
-func encodeV3(token paseto.Token, purpose, keyB64 string) (string, error) {
-	keyBytes, err := decodeBase64Key(keyB64)
+func encodeV3(token paseto.Token, purpose, keyStr, keyFormat string) (string, error) {
+	keyBytes, err := decodeKey(keyStr, keyFormat)
 	if err != nil {
-		return "", fmt.Errorf("invalid base64 key: %w", err)
+		return "", fmt.Errorf("invalid key: %w", err)
 	}
 
 	switch purpose {
@@ -198,10 +225,10 @@ func encodeV3(token paseto.Token, purpose, keyB64 string) (string, error) {
 	}
 }
 
-func encodeV4(token paseto.Token, purpose, keyB64 string) (string, error) {
-	keyBytes, err := decodeBase64Key(keyB64)
+func encodeV4(token paseto.Token, purpose, keyStr, keyFormat string) (string, error) {
+	keyBytes, err := decodeKey(keyStr, keyFormat)
 	if err != nil {
-		return "", fmt.Errorf("invalid base64 key: %w", err)
+		return "", fmt.Errorf("invalid key: %w", err)
 	}
 
 	switch purpose {
@@ -245,6 +272,12 @@ func DecodePaseto(req DecodeRequest) (*DecodeResponse, error) {
 		}
 	}
 
+	// Default key format to base64
+	keyFormat := req.KeyFormat
+	if keyFormat == "" {
+		keyFormat = "base64"
+	}
+
 	var token *paseto.Token
 	var err error
 
@@ -252,11 +285,11 @@ func DecodePaseto(req DecodeRequest) (*DecodeResponse, error) {
 
 	switch version {
 	case "v2":
-		token, err = decodeV2(parser, req.Token, purpose, req.Key)
+		token, err = decodeV2(parser, req.Token, purpose, req.Key, keyFormat)
 	case "v3":
-		token, err = decodeV3(parser, req.Token, purpose, req.Key)
+		token, err = decodeV3(parser, req.Token, purpose, req.Key, keyFormat)
 	case "v4":
-		token, err = decodeV4(parser, req.Token, purpose, req.Key)
+		token, err = decodeV4(parser, req.Token, purpose, req.Key, keyFormat)
 	default:
 		return nil, fmt.Errorf("unsupported version: %s", version)
 	}
@@ -297,10 +330,10 @@ func detectTokenType(tokenString string) (version, purpose string, err error) {
 	return version, purpose, nil
 }
 
-func decodeV2(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paseto.Token, error) {
-	keyBytes, err := decodeBase64Key(keyB64)
+func decodeV2(parser paseto.Parser, tokenString, purpose, keyStr, keyFormat string) (*paseto.Token, error) {
+	keyBytes, err := decodeKey(keyStr, keyFormat)
 	if err != nil {
-		return nil, fmt.Errorf("invalid base64 key: %w", err)
+		return nil, fmt.Errorf("invalid key: %w", err)
 	}
 
 	switch purpose {
@@ -327,10 +360,10 @@ func decodeV2(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paset
 	}
 }
 
-func decodeV3(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paseto.Token, error) {
-	keyBytes, err := decodeBase64Key(keyB64)
+func decodeV3(parser paseto.Parser, tokenString, purpose, keyStr, keyFormat string) (*paseto.Token, error) {
+	keyBytes, err := decodeKey(keyStr, keyFormat)
 	if err != nil {
-		return nil, fmt.Errorf("invalid base64 key: %w", err)
+		return nil, fmt.Errorf("invalid key: %w", err)
 	}
 
 	switch purpose {
@@ -357,10 +390,10 @@ func decodeV3(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paset
 	}
 }
 
-func decodeV4(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paseto.Token, error) {
-	keyBytes, err := decodeBase64Key(keyB64)
+func decodeV4(parser paseto.Parser, tokenString, purpose, keyStr, keyFormat string) (*paseto.Token, error) {
+	keyBytes, err := decodeKey(keyStr, keyFormat)
 	if err != nil {
-		return nil, fmt.Errorf("invalid base64 key: %w", err)
+		return nil, fmt.Errorf("invalid key: %w", err)
 	}
 
 	switch purpose {
@@ -389,69 +422,75 @@ func decodeV4(parser paseto.Parser, tokenString, purpose, keyB64 string) (*paset
 
 // GenerateKeys generates new keys for the specified version and purpose
 func GenerateKeys(req GenerateKeysRequest) (*GenerateKeysResponse, error) {
+	// Default key format to base64
+	keyFormat := req.KeyFormat
+	if keyFormat == "" {
+		keyFormat = "base64"
+	}
+
 	switch req.Version {
 	case "v2":
-		return generateV2Keys(req.Purpose)
+		return generateV2Keys(req.Purpose, keyFormat)
 	case "v3":
-		return generateV3Keys(req.Purpose)
+		return generateV3Keys(req.Purpose, keyFormat)
 	case "v4":
-		return generateV4Keys(req.Purpose)
+		return generateV4Keys(req.Purpose, keyFormat)
 	default:
 		return nil, fmt.Errorf("unsupported version: %s", req.Version)
 	}
 }
 
-func generateV2Keys(purpose string) (*GenerateKeysResponse, error) {
+func generateV2Keys(purpose, keyFormat string) (*GenerateKeysResponse, error) {
 	switch purpose {
 	case "local":
 		key := paseto.NewV2SymmetricKey()
 		return &GenerateKeysResponse{
-			SymmetricKey: encodeBase64Key(key.ExportBytes()),
+			SymmetricKey: encodeKeyForFormat(key.ExportBytes(), keyFormat),
 		}, nil
 	case "public":
 		secretKey := paseto.NewV2AsymmetricSecretKey()
 		publicKey := secretKey.Public()
 		return &GenerateKeysResponse{
-			SecretKey: encodeBase64Key(secretKey.ExportBytes()),
-			PublicKey: encodeBase64Key(publicKey.ExportBytes()),
+			SecretKey: encodeKeyForFormat(secretKey.ExportBytes(), keyFormat),
+			PublicKey: encodeKeyForFormat(publicKey.ExportBytes(), keyFormat),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported purpose: %s", purpose)
 	}
 }
 
-func generateV3Keys(purpose string) (*GenerateKeysResponse, error) {
+func generateV3Keys(purpose, keyFormat string) (*GenerateKeysResponse, error) {
 	switch purpose {
 	case "local":
 		key := paseto.NewV3SymmetricKey()
 		return &GenerateKeysResponse{
-			SymmetricKey: encodeBase64Key(key.ExportBytes()),
+			SymmetricKey: encodeKeyForFormat(key.ExportBytes(), keyFormat),
 		}, nil
 	case "public":
 		secretKey := paseto.NewV3AsymmetricSecretKey()
 		publicKey := secretKey.Public()
 		return &GenerateKeysResponse{
-			SecretKey: encodeBase64Key(secretKey.ExportBytes()),
-			PublicKey: encodeBase64Key(publicKey.ExportBytes()),
+			SecretKey: encodeKeyForFormat(secretKey.ExportBytes(), keyFormat),
+			PublicKey: encodeKeyForFormat(publicKey.ExportBytes(), keyFormat),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported purpose: %s", purpose)
 	}
 }
 
-func generateV4Keys(purpose string) (*GenerateKeysResponse, error) {
+func generateV4Keys(purpose, keyFormat string) (*GenerateKeysResponse, error) {
 	switch purpose {
 	case "local":
 		key := paseto.NewV4SymmetricKey()
 		return &GenerateKeysResponse{
-			SymmetricKey: encodeBase64Key(key.ExportBytes()),
+			SymmetricKey: encodeKeyForFormat(key.ExportBytes(), keyFormat),
 		}, nil
 	case "public":
 		secretKey := paseto.NewV4AsymmetricSecretKey()
 		publicKey := secretKey.Public()
 		return &GenerateKeysResponse{
-			SecretKey: encodeBase64Key(secretKey.ExportBytes()),
-			PublicKey: encodeBase64Key(publicKey.ExportBytes()),
+			SecretKey: encodeKeyForFormat(secretKey.ExportBytes(), keyFormat),
+			PublicKey: encodeKeyForFormat(publicKey.ExportBytes(), keyFormat),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported purpose: %s", purpose)

@@ -279,6 +279,14 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label for="key-format">Key Format</label>
+                <select id="key-format" onchange="updateKeyPlaceholder(); clearGeneratedKeys()">
+                    <option value="base64">Base64 (standard)</option>
+                    <option value="raw">Raw UTF-8 (oauth-gateway compatible)</option>
+                </select>
+            </div>
+
             <!-- Encode Section -->
             <div id="encode-section">
                 <div class="form-group">
@@ -355,23 +363,49 @@
         function updateKeyPlaceholder() {
             const version = document.getElementById('version').value;
             const purpose = document.getElementById('purpose').value;
+            const keyFormat = document.getElementById('key-format').value;
             const encodeKeyInput = document.getElementById('encode-key');
             const decodeKeyInput = document.getElementById('decode-key');
             const keyHint = document.getElementById('key-hint');
+            const keyLabel = document.getElementById('key-label');
+            const decodeKeyLabel = document.getElementById('decode-key-label');
+
+            const isRaw = keyFormat === 'raw';
+            const formatLabel = isRaw ? 'Raw UTF-8' : 'Base64';
+            keyLabel.textContent = `Key (${formatLabel})`;
+            decodeKeyLabel.textContent = `Key (${formatLabel})`;
 
             if (purpose === 'local') {
-                encodeKeyInput.placeholder = 'Base64-encoded symmetric key (32 bytes)';
-                decodeKeyInput.placeholder = 'Base64-encoded symmetric key (32 bytes)';
-                keyHint.textContent = 'Symmetric key: 32 bytes (44 chars in base64)';
+                if (isRaw) {
+                    encodeKeyInput.placeholder = '32-character string (e.g., 0123456789ABCDEF0123456789ABCDEF)';
+                    decodeKeyInput.placeholder = '32-character string';
+                    keyHint.textContent = 'Symmetric key: exactly 32 ASCII characters';
+                } else {
+                    encodeKeyInput.placeholder = 'Base64-encoded symmetric key (32 bytes)';
+                    decodeKeyInput.placeholder = 'Base64-encoded symmetric key (32 bytes)';
+                    keyHint.textContent = 'Symmetric key: 32 bytes (44 chars in base64)';
+                }
             } else {
                 if (version === 'v3') {
-                    encodeKeyInput.placeholder = 'Base64-encoded secret key (48 bytes)';
-                    decodeKeyInput.placeholder = 'Base64-encoded public key (49 bytes)';
-                    keyHint.textContent = 'V3 uses P-384: secret key 48 bytes, public key 49 bytes';
+                    if (isRaw) {
+                        encodeKeyInput.placeholder = '48-character string for secret key';
+                        decodeKeyInput.placeholder = '49-character string for public key';
+                        keyHint.textContent = 'V3 P-384: secret key 48 chars, public key 49 chars';
+                    } else {
+                        encodeKeyInput.placeholder = 'Base64-encoded secret key (48 bytes)';
+                        decodeKeyInput.placeholder = 'Base64-encoded public key (49 bytes)';
+                        keyHint.textContent = 'V3 uses P-384: secret key 48 bytes, public key 49 bytes';
+                    }
                 } else {
-                    encodeKeyInput.placeholder = 'Base64-encoded secret key (64 bytes)';
-                    decodeKeyInput.placeholder = 'Base64-encoded public key (32 bytes)';
-                    keyHint.textContent = 'V2/V4 use Ed25519: secret key 64 bytes, public key 32 bytes';
+                    if (isRaw) {
+                        encodeKeyInput.placeholder = '64-character string for secret key';
+                        decodeKeyInput.placeholder = '32-character string for public key';
+                        keyHint.textContent = 'V2/V4 Ed25519: secret key 64 chars, public key 32 chars';
+                    } else {
+                        encodeKeyInput.placeholder = 'Base64-encoded secret key (64 bytes)';
+                        decodeKeyInput.placeholder = 'Base64-encoded public key (32 bytes)';
+                        keyHint.textContent = 'V2/V4 use Ed25519: secret key 64 bytes, public key 32 bytes';
+                    }
                 }
             }
         }
@@ -379,12 +413,13 @@
         async function generateKey() {
             const version = document.getElementById('version').value;
             const purpose = document.getElementById('purpose').value;
+            const keyFormat = document.getElementById('key-format').value;
 
             try {
                 const response = await fetch('/api/generate-keys', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ version, purpose })
+                    body: JSON.stringify({ version, purpose, keyFormat })
                 });
 
                 const data = await response.json();
@@ -419,6 +454,7 @@
         async function encode() {
             const version = document.getElementById('version').value;
             const purpose = document.getElementById('purpose').value;
+            const keyFormat = document.getElementById('key-format').value;
             const payloadText = document.getElementById('payload').value;
             const footer = document.getElementById('footer').value;
             const key = document.getElementById('encode-key').value;
@@ -440,7 +476,7 @@
                 const response = await fetch('/api/encode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ version, purpose, payload, key, footer })
+                    body: JSON.stringify({ version, purpose, payload, key, keyFormat, footer })
                 });
 
                 const data = await response.json();
@@ -459,6 +495,7 @@
         async function decode() {
             const token = document.getElementById('token-input').value;
             const key = document.getElementById('decode-key').value;
+            const keyFormat = document.getElementById('key-format').value;
 
             if (!token) {
                 showResult('Please provide a token to decode', true);
@@ -474,7 +511,7 @@
                 const response = await fetch('/api/decode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token, key })
+                    body: JSON.stringify({ token, key, keyFormat })
                 });
 
                 const data = await response.json();
